@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistemas Distribuídos: CAP & PACELC Simulator</title>
+    <!-- Tailwind CSS for high-fidelity styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js for live metrics tracing -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Fonts: Outfit & JetBrains Mono for a highly readable developer theme -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for professional layout icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #090d16;
+            color: #f1f5f9;
+        }
+        .code-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        /* Custom animated SVG link styling */
+        .sync-packet {
+            stroke-dasharray: 8;
+            animation: flow 1.5s linear infinite;
+        }
+        .sync-packet-paused {
+            stroke-dasharray: 8;
+            stroke-dashoffset: 0;
+            animation: none !important;
+        }
+        @keyframes flow {
+            to {
+                stroke-dashoffset: -20;
+            }
+        }
+        /* Glassmorphism styling */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(51, 65, 85, 0.5);
+        }
+    </style>
+</head>
+<body class="min-h-screen selection:bg-indigo-500 selection:text-white overflow-x-hidden">
+
+    <!-- Top Premium Navigation -->
+    <header class="border-b border-slate-800/80 bg-slate-950/80 sticky top-0 z-50 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between py-4">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                    <i class="fa-solid fa-circle-nodes text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-indigo-400 bg-clip-text text-transparent">
+                        CAP & PACELC Lab
+                    </h1>
+                    <p class="text-xs text-slate-400 font-medium">Engenharia de Aplicações Web Backend</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                    <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 mr-1.5 animate-pulse"></span>
+                    Simulador Interativo
+                </span>
+                <a href="#theoretical-ref" class="text-xs font-semibold text-slate-400 hover:text-white transition duration-200">
+                    <i class="fa-solid fa-circle-info mr-1"></i> Teoria
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Playground Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        
+        <!-- Interactive Panel: Presets & Configurations -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- System Profiles and Presets -->
+            <div class="glass-panel rounded-3xl p-6 flex flex-col justify-between space-y-6">
+                <div>
+                    <div class="flex items-center space-x-2.5 mb-4">
+                        <div class="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400 border border-indigo-500/20">
+                            <i class="fa-solid fa-sliders"></i>
+                        </div>
+                        <h2 class="text-lg font-bold">Perfis de Consistência</h2>
+                    </div>
+                    <p class="text-xs text-slate-400 mb-4 leading-relaxed">
+                        Escolha um banco de dados real do mercado ou configure manualmente seus parâmetros de consistência, réplicas e estratégia de replicação.
+                    </p>
+
+                    <!-- Presets Selection -->
+                    <div class="space-y-2 mb-6">
+                        <label class="text-xs font-bold text-slate-400 uppercase tracking-wider block">Bancos de Dados Predefinidos</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="applyPreset('cassandra')" id="preset-cassandra" class="p-3 text-left rounded-xl border border-slate-800 bg-slate-900/40 hover:border-indigo-500/50 hover:bg-slate-900 transition flex flex-col justify-between group">
+                                <span class="font-bold text-sm text-slate-200 group-hover:text-white">Cassandra</span>
+                                <span class="text-[10px] text-emerald-400 font-bold uppercase mt-1">PA / EL (Eventual)</span>
+                            </button>
+                            <button onclick="applyPreset('mongodb')" id="preset-mongodb" class="p-3 text-left rounded-xl border border-slate-800 bg-slate-900/40 hover:border-indigo-500/50 hover:bg-slate-900 transition flex flex-col justify-between group">
+                                <span class="font-bold text-sm text-slate-200 group-hover:text-white">MongoDB (W:Maj)</span>
+                                <span class="text-[10px] text-indigo-400 font-bold uppercase mt-1">CP / PC/EC (Strong)</span>
+                            </button>
+                            <button onclick="applyPreset('spanner')" id="preset-spanner" class="p-3 text-left rounded-xl border border-slate-800 bg-slate-900/40 hover:border-indigo-500/50 hover:bg-slate-900 transition flex flex-col justify-between group">
+                                <span class="font-bold text-sm text-slate-200 group-hover:text-white">Spanner / Cockroach</span>
+                                <span class="text-[10px] text-purple-400 font-bold uppercase mt-1">CP / PC/EC (Strict)</span>
+                            </button>
+                            <button onclick="applyPreset('custom')" id="preset-custom" class="p-3 text-left rounded-xl border-2 border-indigo-500/50 bg-slate-900/60 hover:bg-slate-900 transition flex flex-col justify-between group">
+                                <span class="font-bold text-sm text-white">Manual Custom</span>
+                                <span class="text-[10px] text-slate-400 font-bold uppercase mt-1">Ajuste Livre</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Custom Params Sliders/Toggles (Active when 'Custom' is selected) -->
+                <div id="custom-params-area" class="space-y-4 pt-4 border-t border-slate-800">
+                    <div>
+                        <div class="flex justify-between items-center mb-1.5">
+                            <label class="text-xs font-bold text-slate-400 uppercase tracking-wider">Write Consistency Level</label>
+                            <span id="label-write-consistency" class="text-xs font-bold text-indigo-400 code-font">QUORUM (2)</span>
+                        </div>
+                        <div class="flex bg-slate-950 p-1 rounded-lg border border-slate-800">
+                            <button onclick="setWriteConsistency('ONE')" id="w-one" class="flex-1 py-1.5 text-center text-xs font-bold rounded-md hover:text-white transition">ONE</button>
+                            <button onclick="setWriteConsistency('QUORUM')" id="w-quorum" class="flex-1 py-1.5 text-center text-xs font-bold rounded-md bg-indigo-600 text-white shadow transition">QUORUM</button>
+                            <button onclick="setWriteConsistency('ALL')" id="w-all" class="flex-1 py-1.5 text-center text-xs font-bold rounded-md hover:text-white transition">ALL</button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between items-center mb-1.5">
+                            <label class="text-xs font-bold text-slate-400 uppercase tracking-wider">Read Consistency Level</label>
+                            <span id="label-read-consistency" class="text-xs font-bold text-indigo-400 code-font">QUORUM (2)</span>
+                        </div>
+                        <div class="flex bg-slate-950 p-1 rounded-lg border border-slate-800">
+                            <button onclick="setReadConsistency('ONE')" id="r-one" class="flex-1 py-1.5 text-center text-xs font-bold rounded-md hover:text-white transition">ONE</button>
+                            <button onclick="setReadConsistency('QUORUM')" id="r-quorum" class="flex-1 py-1.5 text-center text-xs font-bold rounded-md bg-indigo-600 text-white shadow transition">QUORUM</button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Estratégia de Replicação (Tempo de Paz)</label>
+                        <div class="flex bg-slate-950 p-1 rounded-lg border border-slate-800">
+                            <button onclick="setReplicationStrategy('async')" id="rep-async" class="flex-1 py-1.5 text-center text-xs font-bold rounded-md hover:text-white transition">Assíncrona (L)</button>
+                            <button onclick="setReplicationStrategy('sync')" id="rep-sync" class="flex-1 py-1.5 text-center text-xs font-bold bg-indigo-600 text-white shadow rounded-md transition">Síncrona (C)</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Interactive Visual Topology Map (Center Canvas/SVG) -->
+            <div class="glass-panel rounded-3xl p-6 lg:col-span-2 flex flex-col justify-between space-y-6 min-h-[480px]">
+                <div class="flex justify-between items-center border-b border-slate-800/80 pb-4">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400 border border-emerald-500/20">
+                            <i class="fa-solid fa-diagram-project"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-bold">Topologia de Rede Distribuída</h2>
+                            <p class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">3 Nós (Replicação Ativa)</p>
+                        </div>
+                    </div>
+
+                    <!-- Network State Controls -->
+                    <div class="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+                        <button onclick="setNetworkState('healthy')" id="net-healthy" class="px-3 py-1.5 text-xs font-bold rounded-lg transition bg-emerald-600 text-white">
+                            <i class="fa-solid fa-heart mr-1"></i> Saudável
+                        </button>
+                        <button onclick="setNetworkState('partition')" id="net-partition" class="px-3 py-1.5 text-xs font-bold rounded-lg transition text-slate-400 hover:text-white">
+                            <i class="fa-solid fa-scissors mr-1"></i> Particionar (C isolado)
+                        </button>
+                        <button onclick="setNetworkState('isolation')" id="net-isolation" class="px-3 py-1.5 text-xs font-bold rounded-lg transition text-slate-400 hover:text-white">
+                            <i class="fa-solid fa-skull-crossbones mr-1"></i> Isolamento Total
+                        </button>
+                    </div>
+                </div>
+
+                <!-- SVG and Interactive CSS Nodes Canvas -->
+                <div class="relative flex-1 flex items-center justify-center py-6">
+                    
+                    <!-- SVG Link Connections -->
+                    <svg class="absolute inset-0 w-full h-full pointer-events-none" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <linearGradient id="grad-active" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#3b82f6" />
+                                <stop offset="100%" stop-color="#8b5cf6" />
+                            </linearGradient>
+                            <linearGradient id="grad-broken" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#ef4444" stop-opacity="0.2" />
+                                <stop offset="100%" stop-color="#ef4444" stop-opacity="0.2" />
+                            </linearGradient>
+                        </defs>
+
+                        <!-- Link A <-> B -->
+                        <path id="link-ab" d="M 150 120 L 350 120" stroke="url(#grad-active)" stroke-width="4" stroke-linecap="round" fill="none" class="sync-packet" />
+                        <!-- Link B <-> C -->
+                        <path id="link-bc" d="M 350 120 L 250 280" stroke="url(#grad-active)" stroke-width="4" stroke-linecap="round" fill="none" class="sync-packet" />
+                        <!-- Link A <-> C -->
+                        <path id="link-ac" d="M 150 120 L 250 280" stroke="url(#grad-active)" stroke-width="4" stroke-linecap="round" fill="none" class="sync-packet" />
+                    </svg>
+
+                    <!-- Network Nodes Graph Elements -->
+                    <div class="w-full h-full min-h-[280px] relative flex justify-around items-center">
+                        
+                        <!-- Node Alpha (N1) -->
+                        <div id="node-n1" class="absolute left-[15%] top-[10%] w-36 bg-slate-900 border-2 border-slate-700 rounded-2xl p-4 flex flex-col items-center justify-center text-center transition-all duration-300 shadow-xl">
+                            <div class="flex items-center space-x-1.5 mb-2">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500" id="n1-status-dot"></span>
+                                <span class="text-xs font-bold uppercase tracking-wider text-slate-300">Nó Alpha</span>
+                            </div>
+                            <span class="text-3xl font-black text-indigo-400 code-font my-2" id="n1-val">V=100</span>
+                            <span class="text-[9px] text-slate-400 font-bold uppercase code-font bg-slate-950 px-2 py-0.5 rounded-full" id="n1-version">Versão: 1</span>
+                            
+                            <!-- Operations Buttons Inside Node -->
+                            <div class="mt-4 flex space-x-1.5 w-full">
+                                <button onclick="triggerNodeWrite('n1')" class="flex-1 py-1 px-2 text-[10px] font-extrabold uppercase bg-indigo-600/30 hover:bg-indigo-600 border border-indigo-500/30 hover:border-indigo-500 text-white rounded-lg transition">Escrever</button>
+                                <button onclick="triggerNodeRead('n1')" class="flex-1 py-1 px-2 text-[10px] font-extrabold uppercase bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white rounded-lg transition">Ler</button>
+                            </div>
+                        </div>
+
+                        <!-- Node Beta (N2) -->
+                        <div id="node-n2" class="absolute right-[15%] top-[10%] w-36 bg-slate-900 border-2 border-slate-700 rounded-2xl p-4 flex flex-col items-center justify-center text-center transition-all duration-300 shadow-xl">
+                            <div class="flex items-center space-x-1.5 mb-2">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500" id="n2-status-dot"></span>
+                                <span class="text-xs font-bold uppercase tracking-wider text-slate-300">Nó Beta</span>
+                            </div>
+                            <span class="text-3xl font-black text-indigo-400 code-font my-2" id="n2-val">V=100</span>
+                            <span class="text-[9px] text-slate-400 font-bold uppercase code-font bg-slate-950 px-2 py-0.5 rounded-full" id="n2-version">Versão: 1</span>
+                            
+                            <div class="mt-4 flex space-x-1.5 w-full">
+                                <button onclick="triggerNodeWrite('n2')" class="flex-1 py-1 px-2 text-[10px] font-extrabold uppercase bg-indigo-600/30 hover:bg-indigo-600 border border-indigo-500/30 hover:border-indigo-500 text-white rounded-lg transition">Escrever</button>
+                                <button onclick="triggerNodeRead('n2')" class="flex-1 py-1 px-2 text-[10px] font-extrabold uppercase bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white rounded-lg transition">Ler</button>
+                            </div>
+                        </div>
+
+                        <!-- Node Gamma (N3) - The Partition Subject -->
+                        <div id="node-n3" class="absolute left-[50%] -translate-x-1/2 bottom-[5%] w-36 bg-slate-900 border-2 border-slate-700 rounded-2xl p-4 flex flex-col items-center justify-center text-center transition-all duration-300 shadow-xl">
+                            <div class="flex items-center space-x-1.5 mb-2">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500" id="n3-status-dot"></span>
+                                <span class="text-xs font-bold uppercase tracking-wider text-slate-300">Nó Gamma</span>
+                            </div>
+                            <span class="text-3xl font-black text-indigo-400 code-font my-2" id="n3-val">V=100</span>
+                            <span class="text-[9px] text-slate-400 font-bold uppercase code-font bg-slate-950 px-2 py-0.5 rounded-full" id="n3-version">Versão: 1</span>
+                            
+                            <div class="mt-4 flex space-x-1.5 w-full">
+                                <button onclick="triggerNodeWrite('n3')" class="flex-1 py-1 px-2 text-[10px] font-extrabold uppercase bg-indigo-600/30 hover:bg-indigo-600 border border-indigo-500/30 hover:border-indigo-500 text-white rounded-lg transition">Escrever</button>
+                                <button onclick="triggerNodeRead('n3')" class="flex-1 py-1 px-2 text-[10px] font-extrabold uppercase bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white rounded-lg transition">Ler</button>
+                            </div>
+                        </div>
+
+                        <!-- Network Split visual indicator line -->
+                        <div id="visual-partition-wall" class="absolute left-0 right-0 top-[60%] h-1 bg-red-500/60 shadow-lg shadow-red-500/50 hidden flex items-center justify-center">
+                            <span class="bg-red-600 text-[10px] font-bold uppercase px-3 py-0.5 rounded-full text-white border border-red-500/40 tracking-widest">Partição de Rede Ativa</span>
+                        </div>
+                        
+                        <!-- Visual Isolation Indicator Overlay -->
+                        <div id="visual-isolation-overlay" class="absolute inset-0 bg-red-950/20 pointer-events-none hidden border-2 border-red-500/30 rounded-2xl"></div>
+                    </div>
+                </div>
+
+                <!-- Simulation Info Strip bar -->
+                <div class="flex flex-col md:flex-row items-center justify-between bg-slate-950 px-5 py-3.5 rounded-2xl border border-slate-800 text-xs">
+                    <div class="flex items-center space-x-2 text-slate-400 mb-2 md:mb-0">
+                        <i class="fa-solid fa-circle-exclamation text-indigo-400"></i>
+                        <span>Clique em <strong class="text-white">"Escrever"</strong> em qualquer nó para iniciar a persistência de um novo dado.</span>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <span id="label-quorum-info" class="font-bold text-slate-300">Quorum Mínimo Exigido: <span class="text-indigo-400 code-font">2 Nós</span></span>
+                        <button onclick="resetDataValues()" class="text-xs font-bold text-slate-400 hover:text-white transition">
+                            <i class="fa-solid fa-arrow-rotate-left mr-1"></i> Resetar Dados
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Live Telemetry & Database Analytics Metrics -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Gauges & Numerical Metrics -->
+            <div class="glass-panel rounded-3xl p-6 space-y-6 lg:col-span-1">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400 border border-indigo-500/20">
+                        <i class="fa-solid fa-gauge-high"></i>
+                    </div>
+                    <h2 class="text-lg font-bold">Métricas de Latência e Consistência</h2>
+                </div>
+
+                <!-- Metric Gauges Layout -->
+                <div class="space-y-4">
+                    <!-- Write Latency -->
+                    <div class="p-4 bg-slate-950 rounded-2xl border border-slate-800">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Latência de Escrita (Tempo de Resposta)</span>
+                            <span id="metric-write-latency" class="text-sm font-bold text-emerald-400 code-font">1.2 ms</span>
+                        </div>
+                        <div class="w-full bg-slate-900 h-2 rounded-full overflow-hidden">
+                            <div id="bar-write-latency" class="h-full bg-emerald-500 transition-all duration-300" style="width: 12%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Read Latency -->
+                    <div class="p-4 bg-slate-950 rounded-2xl border border-slate-800">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Latência de Leitura (Tempo de Resposta)</span>
+                            <span id="metric-read-latency" class="text-sm font-bold text-emerald-400 code-font">0.8 ms</span>
+                        </div>
+                        <div class="w-full bg-slate-900 h-2 rounded-full overflow-hidden">
+                            <div id="bar-read-latency" class="h-full bg-emerald-500 transition-all duration-300" style="width: 8%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Data Inconsistency Index -->
+                    <div class="p-4 bg-slate-950 rounded-2xl border border-slate-800">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Índice de Inconsistência (Data Drift)</span>
+                            <span id="metric-inconsistency" class="text-sm font-bold text-emerald-400 code-font">0% (Sincronizado)</span>
+                        </div>
+                        <div class="w-full bg-slate-900 h-2 rounded-full overflow-hidden">
+                            <div id="bar-inconsistency" class="h-full bg-emerald-500 transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- SLA Availability Rate -->
+                    <div class="p-4 bg-slate-950 rounded-2xl border border-slate-800">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Disponibilidade do Serviço (SLA)</span>
+                            <span id="metric-sla" class="text-sm font-bold text-emerald-400 code-font">100%</span>
+                        </div>
+                        <div class="w-full bg-slate-900 h-2 rounded-full overflow-hidden">
+                            <div id="bar-sla" class="h-full bg-emerald-500 transition-all duration-300" style="width: 100%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Live Chart Analytics Trace -->
+            <div class="glass-panel rounded-3xl p-6 lg:col-span-2 flex flex-col justify-between">
+                <div class="flex items-center justify-between border-b border-slate-800/80 pb-4 mb-4">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400 border border-indigo-500/20">
+                            <i class="fa-solid fa-chart-line"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-bold">Gráfico de Performance em Tempo Real</h2>
+                            <p class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Monitoramento de Latência por Operação (ms)</p>
+                        </div>
+                    </div>
+                    <span class="text-[10px] font-bold text-indigo-400 code-font bg-indigo-500/10 px-2 py-1 rounded border border-indigo-500/20 uppercase">Atualizando</span>
+                </div>
+
+                <div class="flex-1 min-h-[220px]">
+                    <canvas id="livePerformanceChart" class="w-full h-full"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Operational Logs Console -->
+        <section class="glass-panel rounded-3xl p-6">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-4 mb-4">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400 border border-indigo-500/20">
+                        <i class="fa-solid fa-terminal"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-bold">Log de Eventos do Sistema Distribuído</h2>
+                        <p class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Acompanhe as chamadas de API, replicações e falhas</p>
+                    </div>
+                </div>
+                <button onclick="clearSystemLogs()" class="text-xs font-semibold text-slate-400 hover:text-white transition">
+                    Limpar Logs
+                </button>
+            </div>
+
+            <!-- Virtual Console Panel -->
+            <div id="logs-console" class="h-44 bg-slate-950 rounded-2xl p-4 border border-slate-850 overflow-y-auto font-mono text-xs space-y-2">
+                <!-- Sample initial system boot records -->
+                <div class="text-slate-500">[00:00:00] [SYSTEM] Inicializando cluster distribuído...</div>
+                <div class="text-emerald-400">[00:00:01] [SYSTEM] Nós Alpha (N1), Beta (N2) e Gamma (N3) online e sincronizados com Versão 1 (V=100).</div>
+                <div class="text-slate-400">[00:00:01] [SYSTEM] Pronto para aceitar leituras e escritas.</div>
+            </div>
+        </section>
+
+        <!-- Complete Theoretical Reference section for Docents/Students -->
+        <section id="theoretical-ref" class="glass-panel rounded-3xl p-8 space-y-6">
+            <div class="border-b border-slate-800 pb-4">
+                <h2 class="text-2xl font-bold">Guia Teórico para Exploração e Aula Prática</h2>
+                <p class="text-sm text-slate-400">Como mapear este simulador com os conceitos apresentados nos slides.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 text-sm leading-relaxed text-slate-300">
+                <div class="space-y-4">
+                    <h3 class="text-lg font-bold text-white flex items-center">
+                        <span class="w-6 h-6 rounded-md bg-indigo-500/10 text-indigo-400 flex items-center justify-center mr-2 text-xs">1</span>
+                        Compreendendo o Trilema CAP
+                    </h3>
+                    <p>
+                        No cenário **Saudável (Healthy)**, o sistema garante tanto Consistência quanto Disponibilidade de forma síncrona ou assíncrona.
+                    </p>
+                    <p>
+                        Quando você ativa a **Partição de Rede (Partition)**, o Nó Gamma fica isolado. Se você tentar realizar uma escrita com consistência **ALL** ou **QUORUM** no Nó Gamma isolado, a operação falhará por falta de consenso (o nó não consegue alcançar o quorum de 2). Isso demonstra o comportamento **CP (Consistency / Partition-tolerant)**.
+                    </p>
+                    <p>
+                        Se o sistema estiver configurado para consistência de escrita **ONE**, a escrita no Nó Gamma terá sucesso imediato, mas os dados não se propagarão aos outros nós. Ao realizar a leitura no Nó Alpha com consistência **ONE**, o usuário lerá o dado antigo. Isso demonstra o comportamento **AP (Availability / Partition-tolerant)**.
+                    </p>
+                </div>
+
+                <div class="space-y-4">
+                    <h3 class="text-lg font-bold text-white flex items-center">
+                        <span class="w-6 h-6 rounded-md bg-indigo-500/10 text-indigo-400 flex items-center justify-center mr-2 text-xs">2</span>
+                        Mapeando o Teorema PACELC
+                    </h3>
+                    <p>
+                        O Teorema PACELC expande a análise para o tempo de paz: se **não** houver partição (**E**lse), qual é o trade-off entre Latência (**L**) e Consistência (**C**)?
+                    </p>
+                    <p>
+                        Ao selecionar a estratégia de **Replicação Síncrona**, toda escrita deve esperar a confirmação de todos os nós para retornar sucesso ao cliente. No gráfico de performance, observe o aumento expressivo na latência de escrita. No entanto, a consistência é mantida em 100%.
+                    </p>
+                    <p>
+                        Ao alternar para a **Replicação Assíncrona**, a resposta é instantânea ao cliente. A latência cai para quase zero, mas se houver leitura concorrente imediata, o dado poderá retornar inconsistente até que a replicação de background termine (consistência eventual).
+                    </p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Script core logic implementation -->
+    <script>
+        // System variables & State management
+        let config = {
+            preset: 'custom',
+            writeConsistency: 'QUORUM', // ONE, QUORUM, ALL
+            readConsistency: 'QUORUM',  // ONE, QUORUM
+            replication: 'sync',       // sync, async
+            networkState: 'healthy'     // healthy, partition, isolation
+        };
+
+        // Node DB Values (Value and version)
+        let nodes = {
+            n1: { val: 100, version: 1, active: true },
+            n2: { val: 100, version: 1, active: true },
+            n3: { val: 100, version: 1, active: true }
+        };
+
+        // Telemetry Metrics Tracker
+        let metrics = {
+            writeLatency: 1.2,
+            readLatency: 0.8,
+            inconsistency: 0,
+            sla: 100,
+            totalOperations: 0,
+            failedOperations: 0
+        };
+
+        // Chart Data Trace
+        let performanceChart = null;
+        let chartLabels = [];
+        let chartWriteData = [];
+        let chartReadData = [];
+
+        // Setup Application on Window Load
+        window.onload = function () {
+            initializeChart();
+            applyPreset('mongodb'); // Default Starting Point: MongoDB (CP / PC-EC)
+            updateDashboardMetrics();
+        };
+
+        // Setup Preset profiles
+        function applyPreset(presetName) {
+            config.preset = presetName;
+            
+            // Remove border focus from all presets
+            document.getElementById('preset-cassandra').classList.remove('border-2', 'border-indigo-500/50');
+            document.getElementById('preset-mongodb').classList.remove('border-2', 'border-indigo-500/50');
+            document.getElementById('preset-spanner').classList.remove('border-2', 'border-indigo-500/50');
+            document.getElementById('preset-custom').classList.remove('border-2', 'border-indigo-500/50');
+
+            // Apply selected configuration classes
+            document.getElementById(`preset-${presetName}`).classList.add('border-2', 'border-indigo-500/50');
+
+            if (presetName === 'cassandra') {
+                config.writeConsistency = 'ONE';
+                config.readConsistency = 'ONE';
+                config.replication = 'async';
+                addConsoleLog('SYSTEM', 'Perfil Cassandra aplicado (Foco em Alta Disponibilidade e Baixa Latência: PA/EL).', 'emerald-400');
+            } else if (presetName === 'mongodb') {
+                config.writeConsistency = 'QUORUM';
+                config.readConsistency = 'QUORUM';
+                config.replication = 'sync';
+                addConsoleLog('SYSTEM', 'Perfil MongoDB aplicado (Foco em Consistência e Transações Fortes: CP / PC/EC).', 'indigo-400');
+            } else if (presetName === 'spanner') {
+                config.writeConsistency = 'ALL';
+                config.readConsistency = 'QUORUM';
+                config.replication = 'sync';
+                addConsoleLog('SYSTEM', 'Perfil Spanner aplicado (Foco em Consistência Estrita Global: CP / PC/EC).', 'purple-400');
+            } else if (presetName === 'custom') {
+                addConsoleLog('SYSTEM', 'Configurações manuais ativadas. Sinta-se livre para ajustar os parâmetros.', 'amber-400');
+            }
+
+            syncControlUIElements();
+            updateDashboardMetrics();
+        }
+
+        // Keep UI Controls in sync with config state
+        function syncControlUIElements() {
+            // Write Buttons
+            document.getElementById('w-one').className = "flex-1 py-1.5 text-center text-xs font-bold rounded-md hover:text-white transition";
+            document.getElementById('w-quorum').className = "flex-1 py-1.5 text-center text-xs font-bold rounded-md hover:text-white transition";
+            document.getElementById('w-all').className = "flex-1 py-1.5 text-center text-xs font-bold rounded-md hover:text-white transition";
+            
+            document.getElementById(`w-${config.writeConsistency.toLowerCase()}`).className = "flex-1 py-1.5 text-center text-xs font-bold rounded-md bg-indigo-600 text-white shadow transition";
+            document.getElementById('label-write-consistency').innerText = `${config.writeConsistency} (${config.writeConsistency === 'ONE' ? 1 : config.writeConsistency === 'QUORUM' ? 2 : 3})`;
+
+            // Read Buttons
+            document.getElementById('r-one').className = "flex-1 py-1.5 text-center text-xs font-bold rounded-md hover:text-white transition";
+            document.getElementById('r-quorum').className = "flex-1 py-1.5 text-center text-xs font-bold rounded-md hover:text-white transition";
+            
+            document.getElementById(`r-${config.readConsistency.toLowerCase()}`).className = "flex-1 py-1.5 text-center text-xs font-bold rounded-md bg-indigo-600 text-white shadow transition";
+            document.getElementById('label-read-consistency').innerText = `${config.readConsistency} (${config.readConsistency === 'ONE' ? 1 : 2})`;
+
+            // Replication Buttons
+            document.getElementById('rep-async').className = "flex-1 py-1.5 text-center text-xs font-bold rounded-md hover:text-white transition";
+            document.getElementById('rep-sync').className = "flex-1 py-1.5 text-center text-xs font-bold rounded-md hover:text-white transition";
+            
+            document.getElementById(`rep-${config.replication}`).className = "flex-1 py-1.5 text-center text-xs font-bold bg-indigo-600 text-white shadow rounded-md transition";
+            document.getElementById('label-quorum-info').innerHTML = `Quorum de Escrita Mínimo Exigido: <span class="text-indigo-400 code-font">${config.writeConsistency === 'ONE' ? '1 Nó' : config.writeConsistency === 'QUORUM' ? '2 Nós' : '3 Nós'}</span>`;
+        }
+
+        // Custom config adjust handlers
+        function setWriteConsistency(val) {
+            applyPreset('custom');
+            config.writeConsistency = val;
+            syncControlUIElements();
+            updateDashboardMetrics();
+        }
+
+        function setReadConsistency(val) {
+            applyPreset('custom');
+            config.readConsistency = val;
+            syncControlUIElements();
+            updateDashboardMetrics();
+        }
+
+        function setReplicationStrategy(val) {
+            applyPreset('custom');
+            config.replication = val;
+            syncControlUIElements();
+            updateDashboardMetrics();
+        }
+
+        // Alter network states and topology
+        function setNetworkState(state) {
+            config.networkState = state;
+            
+            const btnHealthy = document.getElementById('net-healthy');
+            const btnPartition = document.getElementById('net-partition');
+            const btnIsolation = document.getElementById('net-isolation');
+            const visualWall = document.getElementById('visual-partition-wall');
+            const visualOverlay = document.getElementById('visual-isolation-overlay');
+
+            // Reset class list
+            btnHealthy.className = "px-3 py-1.5 text-xs font-bold rounded-lg transition text-slate-400 hover:text-white";
+            btnPartition.className = "px-3 py-1.5 text-xs font-bold rounded-lg transition text-slate-400 hover:text-white";
+            btnIsolation.className = "px-3 py-1.5 text-xs font-bold rounded-lg transition text-slate-400 hover:text-white";
+
+            // Visual link paths lines inside SVG
+            const linkAB = document.getElementById('link-ab');
+            const linkBC = document.getElementById('link-bc');
+            const linkAC = document.getElementById('link-ac');
+
+            // Node dots status references
+            const n1Dot = document.getElementById('n1-status-dot');
+            const n2Dot = document.getElementById('n2-status-dot');
+            const n3Dot = document.getElementById('n3-status-dot');
+
+            visualWall.classList.add('hidden');
+            visualOverlay.classList.add('hidden');
+
+            n1Dot.className = "w-2 h-2 rounded-full bg-emerald-500";
+            n2Dot.className = "w-2 h-2 rounded-full bg-emerald-500";
+            n3Dot.className = "w-2 h-2 rounded-full bg-emerald-500";
+
+            if (state === 'healthy') {
+                btnHealthy.className = "px-3 py-1.5 text-xs font-bold rounded-lg transition bg-emerald-600 text-white shadow";
+                addConsoleLog('NETWORK', 'Status da Rede: SAUDÁVEL. Latência de hops zero, replicação fluindo normalmente.', 'emerald-400');
+                
+                linkAB.setAttribute('stroke', 'url(#grad-active)');
+                linkBC.setAttribute('stroke', 'url(#grad-active)');
+                linkAC.setAttribute('stroke', 'url(#grad-active)');
+                
+                linkAB.className.baseVal = "sync-packet";
+                linkBC.className.baseVal = "sync-packet";
+                linkAC.className.baseVal = "sync-packet";
+            } 
+            else if (state === 'partition') {
+                btnPartition.className = "px-3 py-1.5 text-xs font-bold rounded-lg transition bg-red-600 text-white shadow";
+                visualWall.classList.remove('hidden');
+                addConsoleLog('NETWORK', 'Status da Rede: PARTIÇÃO ATIVA. Nó Gamma isolado da rede primária (Nó Alpha e Nó Beta).', 'red-400');
+                
+                linkAB.setAttribute('stroke', 'url(#grad-active)');
+                linkBC.setAttribute('stroke', 'rgba(239, 68, 68, 0.2)');
+                linkAC.setAttribute('stroke', 'rgba(239, 68, 68, 0.2)');
+
+                linkAB.className.baseVal = "sync-packet";
+                linkBC.className.baseVal = "sync-packet-paused";
+                linkAC.className.baseVal = "sync-packet-paused";
+
+                n3Dot.className = "w-2 h-2 rounded-full bg-amber-500 animate-pulse";
+            } 
+            else if (state === 'isolation') {
+                btnIsolation.className = "px-3 py-1.5 text-xs font-bold rounded-lg transition bg-red-800 text-white shadow";
+                visualOverlay.classList.remove('hidden');
+                addConsoleLog('NETWORK', 'Status da Rede: ISOLAMENTO TOTAL. Todos os nós operando de forma isolada (Split-brain total).', 'red-500');
+
+                linkAB.setAttribute('stroke', 'rgba(239, 68, 68, 0.2)');
+                linkBC.setAttribute('stroke', 'rgba(239, 68, 68, 0.2)');
+                linkAC.setAttribute('stroke', 'rgba(239, 68, 68, 0.2)');
+
+                linkAB.className.baseVal = "sync-packet-paused";
+                linkBC.className.baseVal = "sync-packet-paused";
+                linkAC.className.baseVal = "sync-packet-paused";
+
+                n1Dot.className = "w-2 h-2 rounded-full bg-red-500 animate-pulse";
+                n2Dot.className = "w-2 h-2 rounded-full bg-red-500 animate-pulse";
+                n3Dot.className = "w-2 h-2 rounded-full bg-red-500 animate-pulse";
+            }
+
+            updateDashboardMetrics();
+        }
+
+        // Write event simulator
+        function triggerNodeWrite(nodeKey) {
+            metrics.totalOperations++;
+            const newVal = Math.floor(Math.random() * 899) + 100; // Generate arbitrary value
+            addConsoleLog('WRITE', `Escrita iniciada no nó coordenador: ${nodeKey.toUpperCase()} com V=${newVal}...`, 'indigo-300');
+
+            // Find reachable nodes from this coordinator
+            const reachable = getReachableNodes(nodeKey);
+            const consensusRequired = config.writeConsistency === 'ONE' ? 1 : config.writeConsistency === 'QUORUM' ? 2 : 3;
+
+            // Visual pulse on the coordinator node
+            const coordNodeEl = document.getElementById(`node-${nodeKey}`);
+            coordNodeEl.classList.add('scale-105', 'border-indigo-500');
+            setTimeout(() => {
+                coordNodeEl.classList.remove('scale-105', 'border-indigo-500');
+            }, 500);
+
+            // Latency Calculations based on config
+            let currentLatency = 1.0; // Base baseline node time
+            if (config.replication === 'sync') {
+                // Síncrona -> Latência de barramento base aumenta conforme o quorum requisitado
+                currentLatency += consensusRequired * 4.5;
+            } else {
+                // Assíncrona -> Instantâneo pois responde após escrita local
+                currentLatency += 0.5;
+            }
+
+            // Validation of CAP constraints
+            if (reachable.length >= consensusRequired) {
+                // Success Scenario
+                // Commit to coordinator
+                nodes[nodeKey].val = newVal;
+                nodes[nodeKey].version++;
+                document.getElementById(`${nodeKey}-val`).innerText = `V=${newVal}`;
+                document.getElementById(`${nodeKey}-version`).innerText = `Versão: ${nodes[nodeKey].version}`;
+
+                // Trigger sync to reachable peers
+                reachable.forEach(peer => {
+                    if (peer !== nodeKey) {
+                        if (config.replication === 'sync') {
+                            // Synchronous replica persistence right now
+                            nodes[peer].val = newVal;
+                            nodes[peer].version = nodes[nodeKey].version;
+                            document.getElementById(`${peer}-val`).innerText = `V=${newVal}`;
+                            document.getElementById(`${peer}-version`).innerText = `Versão: ${nodes[peer].version}`;
+                        } else {
+                            // Asynchronous background trigger delay simulation
+                            addConsoleLog('REPL', `Agendando replicação assíncrona de background para o peer ${peer.toUpperCase()}...`, 'slate-500');
+                            setTimeout(() => {
+                                // Only replicate if nodes are STILL reachable (even asynchronously) or simulated queue catches up later
+                                const activePeersNow = getReachableNodes(nodeKey);
+                                if (activePeersNow.includes(peer)) {
+                                    nodes[peer].val = newVal;
+                                    nodes[peer].version = nodes[nodeKey].version;
+                                    document.getElementById(`${peer}-val`).innerText = `V=${newVal}`;
+                                    document.getElementById(`${peer}-version`).innerText = `Versão: ${nodes[peer].version}`;
+                                    addConsoleLog('REPL', `Replicação assíncrona persistida com sucesso em ${peer.toUpperCase()}`, 'slate-400');
+                                    updateDashboardMetrics();
+                                }
+                            }, 1200);
+                        }
+                    }
+                });
+
+                metrics.writeLatency = currentLatency;
+                addConsoleLog('SUCCESS', `Escrita bem-sucedida! Confirmada em ${reachable.length} nó(s) (Mínimo exigido: ${consensusRequired}).`, 'emerald-400');
+            } else {
+                // Error Scenario
+                metrics.failedOperations++;
+                metrics.writeLatency = currentLatency * 1.5; // Backoff penalty time
+                addConsoleLog('TIMEOUT', `A ESCRITA FALHOU! Nós acessíveis: ${reachable.length} (Exigido pelo Quorum ${config.writeConsistency}: ${consensusRequired}).`, 'red-500');
+                
+                // Visual node alert crash error animation on the coord
+                coordNodeEl.classList.add('animate-bounce', 'border-red-500');
+                setTimeout(() => {
+                    coordNodeEl.classList.remove('animate-bounce', 'border-red-500');
+                }, 1000);
+            }
+
+            updateDashboardMetrics();
+            pushPerformanceChartData(currentLatency, metrics.readLatency);
+        }
+
+        // Read event simulator
+        function triggerNodeRead(nodeKey) {
+            metrics.totalOperations++;
+            addConsoleLog('READ', `Leitura iniciada no nó: ${nodeKey.toUpperCase()}...`, 'blue-300');
+
+            // Find reachable nodes
+            const reachable = getReachableNodes(nodeKey);
+            const consensusRequired = config.readConsistency === 'ONE' ? 1 : 2;
+
+            // Visual node click pulse
+            const nodeEl = document.getElementById(`node-${nodeKey}`);
+            nodeEl.classList.add('scale-105', 'border-blue-500');
+            setTimeout(() => {
+                nodeEl.classList.remove('scale-105', 'border-blue-500');
+            }, 500);
+
+            let currentLatency = 0.5; // Local node lookup fast time
+            if (config.readConsistency === 'QUORUM') {
+                currentLatency += consensusRequired * 2.5; // Network overhead
+            }
+
+            if (reachable.length >= consensusRequired) {
+                let finalVal = null;
+                let maxVer = -1;
+
+                if (config.readConsistency === 'ONE') {
+                    // Read immediately from node cache
+                    finalVal = nodes[nodeKey].val;
+                    maxVer = nodes[nodeKey].version;
+                } else if (config.readConsistency === 'QUORUM') {
+                    // Gather versions from reachable group and pick latest (Read Repair concept)
+                    reachable.forEach(peer => {
+                        if (nodes[peer].version > maxVer) {
+                            maxVer = nodes[peer].version;
+                            finalVal = nodes[peer].val;
+                        }
+                    });
+
+                    // Perform Read Repair on stale nodes in reachable list
+                    reachable.forEach(peer => {
+                        if (nodes[peer].version < maxVer) {
+                            addConsoleLog('REPAIR', `Read Repair disparado para sincronizar nó ${peer.toUpperCase()} com Versão ${maxVer}`, 'yellow-400');
+                            nodes[peer].val = finalVal;
+                            nodes[peer].version = maxVer;
+                            document.getElementById(`${peer}-val`).innerText = `V=${finalVal}`;
+                            document.getElementById(`${peer}-version`).innerText = `Versão: ${maxVer}`;
+                        }
+                    });
+                }
+
+                // Check for stale metadata visual drift comparison
+                const absoluteMaxGlobalVersion = Math.max(nodes.n1.version, nodes.n2.version, nodes.n3.version);
+                const absoluteMaxGlobalValue = [nodes.n1, nodes.n2, nodes.n3].find(n => n.version === absoluteMaxGlobalVersion)?.val;
+
+                metrics.readLatency = currentLatency;
+
+                if (maxVer < absoluteMaxGlobalVersion) {
+                    addConsoleLog('WARN', `LEITURA RETORNOU DADO OBSOLETO! V=${finalVal} (Versão ${maxVer}). Valor mais recente no Cluster é V=${absoluteMaxGlobalValue} (Versão ${absoluteMaxGlobalVersion}).`, 'amber-400');
+                } else {
+                    addConsoleLog('SUCCESS', `Leitura bem-sucedida! Retornou o valor linearizado mais recente: V=${finalVal} (Versão ${maxVer}).`, 'emerald-400');
+                }
+            } else {
+                // Read blocked scenario
+                metrics.failedOperations++;
+                metrics.readLatency = currentLatency * 2.0;
+                addConsoleLog('TIMEOUT', `A LEITURA FALHOU! Nós acessíveis: ${reachable.length} (Exigido pelo Quorum de Leitura ${config.readConsistency}: ${consensusRequired}).`, 'red-500');
+                
+                nodeEl.classList.add('animate-bounce', 'border-red-500');
+                setTimeout(() => {
+                    nodeEl.classList.remove('animate-bounce', 'border-red-500');
+                }, 1000);
+            }
+
+            updateDashboardMetrics();
+            pushPerformanceChartData(metrics.writeLatency, currentLatency);
+        }
+
+        // Helper resolver to fetch active connections depending on split states
+        function getReachableNodes(nodeKey) {
+            if (config.networkState === 'healthy') {
+                return ['n1', 'n2', 'n3'];
+            } 
+            else if (config.networkState === 'partition') {
+                // Split-brain: Node Alpha & Beta remain linked together, Gamma (N3) isolated
+                if (nodeKey === 'n1' || nodeKey === 'n2') {
+                    return ['n1', 'n2'];
+                } else {
+                    return ['n3']; // Gamma can only reach itself
+                }
+            } 
+            else if (config.networkState === 'isolation') {
+                // All nodes isolated completely
+                return [nodeKey];
+            }
+            return [];
+        }
+
+        // Recalculate metrics gauges and update UI
+        function updateDashboardMetrics() {
+            // Calculate Inconsistency index (Data Drift)
+            let values = [nodes.n1.val, nodes.n2.val, nodes.n3.val];
+            let versions = [nodes.n1.version, nodes.n2.version, nodes.n3.version];
+            
+            let minVal = Math.min(...values);
+            let maxVal = Math.max(...values);
+            let maxVer = Math.max(...versions);
+            let minVer = Math.min(...versions);
+
+            if (maxVer === minVer) {
+                metrics.inconsistency = 0; // Completely synchronized
+            } else {
+                // Drift proportional to variation
+                metrics.inconsistency = Math.round(((maxVer - minVer) / maxVer) * 100);
+            }
+
+            // Calculate active SLA Availability %
+            if (metrics.totalOperations > 0) {
+                metrics.sla = Math.round(((metrics.totalOperations - metrics.failedOperations) / metrics.totalOperations) * 100);
+            } else {
+                metrics.sla = 100;
+            }
+
+            // Update DOM Displays
+            document.getElementById('metric-write-latency').innerText = `${metrics.writeLatency.toFixed(1)} ms`;
+            document.getElementById('bar-write-latency').style.width = `${Math.min(metrics.writeLatency * 8, 100)}%`;
+            updateMetricGaugeColor('bar-write-latency', 'metric-write-latency', metrics.writeLatency, 4, 10);
+
+            document.getElementById('metric-read-latency').innerText = `${metrics.readLatency.toFixed(1)} ms`;
+            document.getElementById('bar-read-latency').style.width = `${Math.min(metrics.readLatency * 8, 100)}%`;
+            updateMetricGaugeColor('bar-read-latency', 'metric-read-latency', metrics.readLatency, 2, 6);
+
+            document.getElementById('metric-inconsistency').innerText = `${metrics.inconsistency}% ${metrics.inconsistency === 0 ? '(Sincronizado)' : '(Dados Divergentes)'}`;
+            document.getElementById('bar-inconsistency').style.width = `${metrics.inconsistency}%`;
+            
+            // Inconsistency specific coloration rules
+            const inconsistencyLabelEl = document.getElementById('metric-inconsistency');
+            const inconsistencyBarEl = document.getElementById('bar-inconsistency');
+            if (metrics.inconsistency === 0) {
+                inconsistencyLabelEl.className = "text-sm font-bold text-emerald-400 code-font";
+                inconsistencyBarEl.className = "h-full bg-emerald-500 transition-all duration-300";
+            } else if (metrics.inconsistency < 40) {
+                inconsistencyLabelEl.className = "text-sm font-bold text-amber-400 code-font";
+                inconsistencyBarEl.className = "h-full bg-amber-500 transition-all duration-300";
+            } else {
+                inconsistencyLabelEl.className = "text-sm font-bold text-rose-400 code-font";
+                inconsistencyBarEl.className = "h-full bg-rose-500 transition-all duration-300";
+            }
+
+            document.getElementById('metric-sla').innerText = `${metrics.sla}%`;
+            document.getElementById('bar-sla').style.width = `${metrics.sla}%`;
+            
+            const slaLabelEl = document.getElementById('metric-sla');
+            const slaBarEl = document.getElementById('bar-sla');
+            if (metrics.sla > 90) {
+                slaLabelEl.className = "text-sm font-bold text-emerald-400 code-font";
+                slaBarEl.className = "h-full bg-emerald-500 transition-all duration-300";
+            } else if (metrics.sla > 70) {
+                slaLabelEl.className = "text-sm font-bold text-amber-400 code-font";
+                slaBarEl.className = "h-full bg-amber-500 transition-all duration-300";
+            } else {
+                slaLabelEl.className = "text-sm font-bold text-rose-400 code-font";
+                slaBarEl.className = "h-full bg-rose-500 transition-all duration-300";
+            }
+        }
+
+        // Color coding dynamically depending on severity
+        function updateMetricGaugeColor(barId, labelId, value, warningThreshold, criticalThreshold) {
+            const bar = document.getElementById(barId);
+            const label = document.getElementById(labelId);
+
+            if (value < warningThreshold) {
+                bar.className = "h-full bg-emerald-500 transition-all duration-300";
+                label.className = "text-sm font-bold text-emerald-400 code-font";
+            } else if (value < criticalThreshold) {
+                bar.className = "h-full bg-amber-500 transition-all duration-300";
+                label.className = "text-sm font-bold text-amber-400 code-font";
+            } else {
+                bar.className = "h-full bg-rose-500 transition-all duration-300";
+                label.className = "text-sm font-bold text-rose-400 code-font";
+            }
+        }
+
+        // Console logger output builder
+        function addConsoleLog(tag, message, colorClass = 'slate-300') {
+            const consoleEl = document.getElementById('logs-console');
+            const timeStr = new Date().toLocaleTimeString();
+            
+            let tagColor = 'bg-slate-800 text-slate-300';
+            if (tag === 'WRITE') tagColor = 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/20';
+            else if (tag === 'READ') tagColor = 'bg-blue-600/20 text-blue-400 border border-blue-500/20';
+            else if (tag === 'SUCCESS') tagColor = 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/20';
+            else if (tag === 'TIMEOUT') tagColor = 'bg-rose-600/20 text-rose-400 border border-rose-500/20';
+            else if (tag === 'NETWORK') tagColor = 'bg-purple-600/20 text-purple-400 border border-purple-500/20';
+            else if (tag === 'WARN' || tag === 'REPAIR') tagColor = 'bg-amber-600/20 text-amber-400 border border-amber-500/20';
+
+            const logEntry = document.createElement('div');
+            logEntry.className = "flex items-start space-x-2 text-xs leading-5";
+            logEntry.innerHTML = `
+                <span class="text-slate-500 select-none font-mono text-[10px] pt-0.5">[${timeStr}]</span>
+                <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${tagColor} tracking-wider font-mono">${tag}</span>
+                <span class="text-${colorClass} font-mono">${message}</span>
+            `;
+
+            consoleEl.appendChild(logEntry);
+            consoleEl.scrollTop = consoleEl.scrollHeight; // Auto-scroll to bottom
+        }
+
+        function clearSystemLogs() {
+            document.getElementById('logs-console').innerHTML = '';
+            addConsoleLog('SYSTEM', 'Logs limpos pelo usuário.', 'slate-400');
+        }
+
+        function resetDataValues() {
+            nodes.n1 = { val: 100, version: 1, active: true };
+            nodes.n2 = { val: 100, version: 1, active: true };
+            nodes.n3 = { val: 100, version: 1, active: true };
+
+            document.getElementById('n1-val').innerText = 'V=100';
+            document.getElementById('n1-version').innerText = 'Versão: 1';
+            document.getElementById('n2-val').innerText = 'V=100';
+            document.getElementById('n2-version').innerText = 'Versão: 1';
+            document.getElementById('n3-val').innerText = 'V=100';
+            document.getElementById('n3-version').innerText = 'Versão: 1';
+
+            metrics.totalOperations = 0;
+            metrics.failedOperations = 0;
+            metrics.writeLatency = 1.2;
+            metrics.readLatency = 0.8;
+
+            addConsoleLog('SYSTEM', 'Dados e versões dos nós limpos e reiniciados para V=100.', 'emerald-400');
+            updateDashboardMetrics();
+        }
+
+        // Chart.js Configuration
+        function initializeChart() {
+            const ctx = document.getElementById('livePerformanceChart').getContext('2d');
+            
+            // Build historical seed metrics
+            for(let i=0; i<10; i++) {
+                chartLabels.push(`Op ${i+1}`);
+                chartWriteData.push(1.2 + Math.random() * 0.4);
+                chartReadData.push(0.8 + Math.random() * 0.3);
+            }
+
+            performanceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartLabels,
+                    datasets: [
+                        {
+                            label: 'Latência de Escrita (ms)',
+                            data: chartWriteData,
+                            borderColor: '#6366f1',
+                            backgroundColor: 'rgba(99, 102, 241, 0.05)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 3
+                        },
+                        {
+                            label: 'Latência de Leitura (ms)',
+                            data: chartReadData,
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.05)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#94a3b8',
+                                font: {
+                                    family: 'Outfit',
+                                    size: 11
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            grid: { color: 'rgba(51, 65, 85, 0.15)' },
+                            ticks: {
+                                color: '#94a3b8',
+                                font: { family: 'JetBrains Mono', size: 10 },
+                                callback: function(value) { return value + ' ms'; }
+                            }
+                        },
+                        x: {
+                            grid: { color: 'rgba(51, 65, 85, 0.15)' },
+                            ticks: {
+                                color: '#94a3b8',
+                                font: { family: 'Outfit', size: 10 }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function pushPerformanceChartData(writeVal, readVal) {
+            if (performanceChart) {
+                chartLabels.shift();
+                chartWriteData.shift();
+                chartReadData.shift();
+
+                chartLabels.push(`Op ${metrics.totalOperations + 10}`);
+                chartWriteData.push(writeVal);
+                chartReadData.push(readVal);
+
+                performanceChart.update();
+            }
+        }
+    </script>
+</body>
+</html>
